@@ -26,6 +26,33 @@ const C = {
 };
 
 /**
+ * Render gorgeous Unicode terminal tables safely processing ANSI string lengths.
+ */
+function drawTable(headers, rows) {
+    const stripAnsi = (str) => String(str).replace(/\x1b\[\d+m/g, '');
+    const realWidths = headers.map((h, i) => Math.max(stripAnsi(h).length, ...rows.map(r => stripAnsi(r[i]).length)));
+
+    const line = (left, mid, right) =>
+        left + realWidths.map(w => '─'.repeat(w + 2)).join(mid) + right;
+
+    let out = '\n   ' + C.gray + line('┌', '┬', '┐') + C.reset + '\n';
+
+    out += '   │ ' + headers.map((h, i) => C.bold + C.white + stripAnsi(h).padEnd(realWidths[i]) + C.reset).join(' │ ') + ' │\n';
+    out += '   ' + C.gray + line('├', '┼', '┤') + C.reset + '\n';
+
+    rows.forEach(r => {
+        out += '   │ ' + r.map((c, i) => {
+            const stripped = stripAnsi(c);
+            const padding = ' '.repeat(realWidths[i] - stripped.length);
+            return c + padding;
+        }).join(' │ ') + ' │\n';
+    });
+
+    out += '   ' + C.gray + line('└', '┴', '┘') + C.reset + '\n';
+    return out;
+}
+
+/**
  * Modular Log Analytics Aggregator class
  * Computes logs auditing, HTTP health distributions, latencies, and traffic bottlenecks.
  */
@@ -125,6 +152,80 @@ class LogAnalyticsTracker {
         return result;
     }
 
+    getTopListed(map, limit = 10) {
+        return Object.entries(map)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, limit);
+    }
+
+    getTopSlowestEndpoints(limit = 10) {
+        return Object.entries(this.pathLatencyStats)
+            .map(([pathStr, stats]) => ({
+                path: pathStr,
+                avg: stats.sumMs / stats.count,
+                count: stats.count,
+                max: stats.maxMs
+            }))
+            .sort((a, b) => b.avg - a.avg)
+            .slice(0, limit);
+    }
+
+    generatePrometheusAlerts() {
+        let yamlAlerts = `groups:\n- name: auto-generated-log-alerts\n  rules:\n`;
+        let hasAlerts = false;
+
+        const errorRate = this.validLines > 0 ? ((this.errorCount / this.validLines) * 100).toFixed(1) : 0;
+        const avgLatency = this.validLines > 0 ? (this.sumLatency / this.validLines).toFixed(1) : 0;
+        const invalidLines = this.totalLines - this.validLines;
+        const invalidRate = ((invalidLines / this.totalLines) * 100).toFixed(1);
+
+        if (errorRate > 0) {
+            yamlAlerts += `  - alert: HighServiceErrorRate
+    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Service 5xx Error Spike"
+      description: "Service is experiencing an error rate of ${errorRate}%."\n\n`;
+            hasAlerts = true;
+        }
+
+        if (avgLatency > 500 || this.maxLatency > 2000) {
+            const topSlowEndpoints = this.getTopSlowestEndpoints(10);
+            const slowTargets = topSlowEndpoints.slice(0, 3).map(b => b.path).join(', ');
+            yamlAlerts += `  - alert: EndpointLatencyDegradation
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 0.5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Performance degradation detected"
+      description: "High latency observed (Max: ${this.maxLatency}ms). Top slow endpoints: ${slowTargets}"\n\n`;
+            hasAlerts = true;
+        }
+
+        if (invalidLines > 0 && this.totalLines > 10) {
+            if (invalidRate > 5) {
+                yamlAlerts += `  - alert: MalformedLogsSpike
+    expr: rate(log_parser_errors_total[5m]) > 0
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Anomaly/Malformed log spike"
+      description: "Parser is dropping ${invalidRate}% of incoming records due to structural format errors."\n\n`;
+                hasAlerts = true;
+            }
+        }
+
+        if (!hasAlerts) {
+            yamlAlerts += `  # System operating within healthy bounds. No critical threshold alerts generated.\n`;
+        }
+
+        return yamlAlerts;
+    }
+
     /**
      * Compute and output the gorgeous ANSI analytics dashboard in terminal.
      */
@@ -141,27 +242,9 @@ class LogAnalyticsTracker {
         const avgLatency = this.validLines > 0 ? (this.sumLatency / this.validLines).toFixed(1) : 0;
         const errorRate = this.validLines > 0 ? ((this.errorCount / this.validLines) * 100).toFixed(1) : 0;
 
-        const getTopListed = (map, limit = 5) => {
-            return Object.entries(map)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, limit);
-        };
-
-        const getTopSlowestEndpoints = (limit = 5) => {
-            return Object.entries(this.pathLatencyStats)
-                .map(([pathStr, stats]) => ({
-                    path: pathStr,
-                    avg: stats.sumMs / stats.count,
-                    count: stats.count,
-                    max: stats.maxMs
-                }))
-                .sort((a, b) => b.avg - a.avg)
-                .slice(0, limit);
-        };
-
-        const topPaths = getTopListed(this.pathHits);
-        const topIps = getTopListed(this.ipHits);
-        const topSlowEndpoints = getTopSlowestEndpoints();
+        const topPaths = this.getTopListed(this.pathHits);
+        const topIps = this.getTopListed(this.ipHits);
+        const topSlowEndpoints = this.getTopSlowestEndpoints();
 
         console.log(`\n${C.bold}${C.cyan}✨ SERVER LOG ANALYSIS DASHBOARD ✨${C.reset}`);
         console.log(C.gray + '-'.repeat(71) + C.reset);
@@ -225,17 +308,19 @@ class LogAnalyticsTracker {
         if (this.validLines === 0) {
             console.log(`   ${C.dim}No engagement metrics processed.${C.reset}`);
         } else {
-            console.log(`   ${C.bold}Top 5 Client IP Targets:${C.reset}`);
-            topIps.forEach(([ip, hits], idx) => {
+            console.log(`   ${C.bold}Top 10 Client IP Targets:${C.reset}`);
+            const ipRows = topIps.map(([ip, hits], idx) => {
                 const percent = ((hits / this.validLines) * 100).toFixed(1);
-                console.log(`   ${idx + 1}. [${hits.toString().padStart(5)} requests - ${percent}%]  ${C.cyan}${ip}${C.reset}`);
+                return [`${idx + 1}`, C.cyan + ip + C.reset, hits.toString(), percent + '%'];
             });
+            console.log(drawTable(['Rank', 'IP Address', 'Hits', 'Traffic Weight'], ipRows));
 
-            console.log(`\n   ${C.bold}Top 5 Most Visited Endpoints:${C.reset}`);
-            topPaths.forEach(([pathVal, hits], idx) => {
+            console.log(`\n   ${C.bold}Top 10 Most Visited Endpoints:${C.reset}`);
+            const pathRows = topPaths.map(([pathVal, hits], idx) => {
                 const percent = ((hits / this.validLines) * 100).toFixed(1);
-                console.log(`   ${idx + 1}. [${hits.toString().padStart(5)} requests - ${percent}%]  ${C.blue}${pathVal}${C.reset}`);
+                return [`${idx + 1}`, C.blue + pathVal + C.reset, hits.toString(), percent + '%'];
             });
+            console.log(drawTable(['Rank', 'Endpoint Route', 'Hits', 'Traffic Weight'], pathRows));
         }
 
         // SECTION 5: PERFORMANCE BOTTLENECKS
@@ -244,10 +329,16 @@ class LogAnalyticsTracker {
             console.log(`   ${C.dim}No valid response timestamps captured to calculate endpoint latencies.${C.reset}`);
         } else {
             console.log(`   Ranked by Consistently Slow average latency (identifies real structural slowdowns):`);
-            topSlowEndpoints.forEach((item, idx) => {
-                console.log(`   ${idx + 1}. ${C.yellow}${item.path.padEnd(20)}${C.reset} -> ${C.red}Avg: ${item.avg.toFixed(1)} ms${C.gray} | Max: ${item.max} ms | Hits: ${item.count}${C.reset}`);
+            const slowRows = topSlowEndpoints.map((item, idx) => {
+                return [`${idx + 1}`, C.yellow + item.path + C.reset, C.red + item.avg.toFixed(1) + ' ms' + C.reset, item.max + ' ms', item.count.toString()];
             });
+            console.log(drawTable(['Rank', 'Target Route Path', 'Avg Latency', 'Max Delay', 'Hits'], slowRows));
         }
+
+        // SECTION 6: ON-CALL ALERT-RULE GENERATOR
+        console.log(`\n${C.bold}${C.bgBlue}${C.white} 🚨 SECTION 6: ON-CALL PROMETHEUS ALERT-RULES ${C.reset}\n`);
+
+        console.log(C.gray + this.generatePrometheusAlerts() + C.reset);
 
         console.log('\n' + C.gray + '-'.repeat(71) + C.reset);
         console.log(`${C.bold}${C.green}✔ Processing and analytics dashboard report successfully rendered.${C.reset}\n`);
@@ -317,6 +408,78 @@ function handleSandboxMode(rl, callback) {
     askLine();
 }
 
+function startQueryEngine(rl, tracker, callback) {
+    console.log(`\n${C.bold}${C.cyan}🤖 NATURAL LANGUAGE QUERY ENGINE ACTIVATED${C.reset}`);
+    console.log(`${C.dim}Ask questions like "show errors", "who are top ips", or "slowest endpoints". Type 'exit' to return.${C.reset}\n`);
+
+    const ask = () => {
+        rl.question(`${C.bold}${C.cyan}Query>${C.reset} `, (q) => {
+            const query = q.trim().toLowerCase();
+            if (query === 'exit' || query === 'quit') {
+                callback();
+                return;
+            }
+            if (query === '') {
+                ask();
+                return;
+            }
+
+            console.log();
+            if (query.includes('slow') || query.includes('bottleneck')) {
+                const topSlowEndpoints = tracker.getTopSlowestEndpoints(10);
+                if (topSlowEndpoints.length === 0) {
+                    console.log(`   ${C.dim}No valid response timestamps captured to calculate endpoint latencies.${C.reset}`);
+                } else {
+                    const slowRows = topSlowEndpoints.map((item, idx) => {
+                        return [`${idx + 1}`, C.yellow + item.path + C.reset, C.red + item.avg.toFixed(1) + ' ms' + C.reset, item.max + ' ms', item.count.toString()];
+                    });
+                    console.log(drawTable(['Rank', 'Target Route Path', 'Avg Latency', 'Max Delay', 'Hits'], slowRows));
+                }
+            } else if (query.includes('ip') || query.includes('visitor') || query.includes('client')) {
+                const topIps = tracker.getTopListed(tracker.ipHits, 10);
+                if (topIps.length === 0) {
+                    console.log(`   ${C.dim}No metrics processed.${C.reset}`);
+                } else {
+                    const ipRows = topIps.map(([ip, hits], idx) => {
+                        const percent = ((hits / tracker.validLines) * 100).toFixed(1);
+                        return [`${idx + 1}`, C.cyan + ip + C.reset, hits.toString(), percent + '%'];
+                    });
+                    console.log(drawTable(['Rank', 'IP Address', 'Hits', 'Traffic Weight'], ipRows));
+                }
+            } else if (query.includes('endpoint') || query.includes('route') || query.includes('hit') || query.includes('path') || query.includes('url')) {
+                const topPaths = tracker.getTopListed(tracker.pathHits, 10);
+                if (topPaths.length === 0) {
+                    console.log(`   ${C.dim}No metrics processed.${C.reset}`);
+                } else {
+                    const pathRows = topPaths.map(([pathVal, hits], idx) => {
+                        const percent = ((hits / tracker.validLines) * 100).toFixed(1);
+                        return [`${idx + 1}`, C.blue + pathVal + C.reset, hits.toString(), percent + '%'];
+                    });
+                    console.log(drawTable(['Rank', 'Endpoint Route', 'Hits', 'Traffic Weight'], pathRows));
+                }
+            } else if (query.includes('error') || query.includes('malformed') || query.includes('health') || query.includes('status')) {
+                if (tracker.validLines === 0) {
+                    console.log(`   ${C.dim}No summary generated.${C.reset}`);
+                } else {
+                    console.log(`   ${C.bold}Status Codes Distribution:${C.reset}`);
+                    const statRows = Object.entries(tracker.statusDistribution).map(([cat, count]) => {
+                        return [cat, count.toString()];
+                    });
+                    console.log(drawTable(['HTTP Status Category', 'Occurrences'], statRows));
+                }
+            } else if (query.includes('rule') || query.includes('alert') || query.includes('prometheus')) {
+                console.log(`   ${C.bold}🚨 ON-CALL PROMETHEUS ALERT-RULES${C.reset}`);
+                console.log(C.gray + tracker.generatePrometheusAlerts() + C.reset);
+            } else {
+                console.log(`   ${C.yellow}I didn't quite catch that. Try asking about "slow endpoints", "top ips", "errors", or "alerts".${C.reset}`);
+            }
+            console.log();
+            ask();
+        });
+    };
+    ask();
+}
+
 /**
  * Standard logs paste list. Collects strings until empty carriage return.
  */
@@ -337,7 +500,7 @@ function handleBatchMode(rl, callback) {
             console.log(`\n⌛ Auditing ${linesCollected.length} logs records. Computing charts...`);
             linesCollected.forEach(l => tracker.processLine(l));
             tracker.printDashboard();
-            promptReturnToMenu(rl, callback);
+            startQueryEngine(rl, tracker, callback);
         } else {
             linesCollected.push(line);
         }
@@ -384,7 +547,7 @@ function handleFilePathPrompt(rl, callback) {
 
         rlFile.on('close', () => {
             tracker.printDashboard();
-            promptReturnToMenu(rl, callback);
+            startQueryEngine(rl, tracker, callback);
         });
     });
 }
@@ -479,7 +642,14 @@ function runDirectBatchCLI(args) {
 
     rlFile.on('close', () => {
         tracker.printDashboard();
-        process.exit(0);
+        const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+        });
+        startQueryEngine(rl, tracker, () => {
+            rl.close();
+            process.exit(0);
+        });
     });
 }
 

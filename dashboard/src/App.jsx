@@ -210,14 +210,14 @@ export default function App() {
         count: stats.count
       }))
       .sort((a, b) => b.avg - a.avg)
-      .slice(0, 5);
+      .slice(0, 10);
   };
 
   const getTopHits = (map) => {
     if (!metrics) return [];
     return Object.entries(map)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
+      .slice(0, 10);
   };
 
   return (
@@ -614,7 +614,7 @@ export default function App() {
               {/* Box 2: Top Active IP Visitors */}
               <div className="glass-panel table-card">
                 <h3 className="chart-title" style={{ borderBottomColor: 'rgba(6, 182, 212, 0.15)', color: 'var(--c-cyan)' }}>
-                  <FiGlobe style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Top Client IP Visitors
+                  <FiGlobe style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Top 10 Client IP Visitors
                 </h3>
                 <div className="table-wrapper">
                   <table className="data-table">
@@ -626,7 +626,7 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {getTopHits(metrics.ipHits).map(([ip, count], idx) => (
+                      {getTopHits(metrics.ipHits).slice(0, 10).map(([ip, count], idx) => (
                         <tr key={idx}>
                           <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{ip}</td>
                           <td style={{ fontWeight: 700 }}>{count}</td>
@@ -642,7 +642,7 @@ export default function App() {
 
               {/* Box 3: Top Hits paths */}
               <div className="glass-panel table-card">
-                <h3 className="chart-title"><FiTarget style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Hot Request Routes</h3>
+                <h3 className="chart-title"><FiTarget style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Top 10 Hot Request Routes</h3>
                 <div className="table-wrapper">
                   <table className="data-table">
                     <thead>
@@ -665,6 +665,72 @@ export default function App() {
                 </div>
               </div>
 
+            </div>
+
+            {/* ROW 4: AI Alert Rules Generator Section */}
+            <div className="glass-panel table-card" style={{ marginTop: '1.5rem', background: 'rgba(255, 179, 0, 0.05)', borderColor: 'rgba(255, 179, 0, 0.2)' }}>
+              <h3 className="chart-title" style={{ color: 'var(--c-accent)', borderBottomColor: 'rgba(255, 179, 0, 0.2)' }}>
+                <FiZap style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Auto-Generated On-Call Alerts (Prometheus YAML)
+              </h3>
+              <pre style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.85rem',
+                color: 'var(--c-text-muted)',
+                background: 'rgba(0,0,0,0.5)',
+                padding: '1rem',
+                borderRadius: '8px',
+                overflowX: 'auto',
+                whiteSpace: 'pre-wrap'
+              }}>
+                {(() => {
+                  let yaml = `groups:\n- name: auto-generated-log-alerts\n  rules:\n`;
+                  let hasAlerts = false;
+
+                  const errRate = parseFloat(metrics.errorRate);
+                  if (errRate > 0) {
+                    yaml += `  - alert: HighServiceErrorRate
+    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Service 5xx Error Spike"
+      description: "Service is experiencing an error rate of ${errRate}%."\n\n`;
+                    hasAlerts = true;
+                  }
+
+                  if (metrics.avgLatency > 500 || metrics.maxLatency > 2000) {
+                    const slowTargets = getBottlenecks().slice(0, 3).map(b => b.path).join(', ');
+                    yaml += `  - alert: EndpointLatencyDegradation
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 0.5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Performance degradation detected"
+      description: "High latency observed (Max: ${metrics.maxLatency}ms). Top slow endpoints: ${slowTargets}"\n\n`;
+                    hasAlerts = true;
+                  }
+
+                  const invalidRate = metrics.totalLines > 10 ? (metrics.invalidLines / metrics.totalLines) * 100 : 0;
+                  if (invalidRate > 5) {
+                    yaml += `  - alert: MalformedLogsSpike
+    expr: rate(log_parser_errors_total[5m]) > 0
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Anomaly/Malformed log spike"
+      description: "Parser is dropping ${invalidRate.toFixed(1)}% of incoming records due to structural format errors."\n\n`;
+                    hasAlerts = true;
+                  }
+
+                  if (!hasAlerts) {
+                    yaml += `  # System operating within healthy bounds. No critical threshold alerts generated.\n`;
+                  }
+                  return yaml;
+                })()}
+              </pre>
             </div>
 
           </div>
