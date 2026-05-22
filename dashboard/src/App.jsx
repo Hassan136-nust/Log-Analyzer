@@ -645,10 +645,68 @@ export default function App() {
             </div>
 
             {/* ROW 5: Natural Language Chat Interface */}
-            <div className="glass-panel" style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-              <h3 className="chart-title" style={{ color: 'var(--c-accent)' }}>
-                <FiMessageSquare style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Natural Language Query Engine
-              </h3>
+            <div className="glass-panel" style={{
+              marginTop: '1.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.07) 0%, rgba(15, 15, 15, 0.85) 100%)',
+              border: '1px solid rgba(255, 215, 0, 0.45)',
+              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 215, 0, 0.12)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+
+              {/* Subtle background glow effect */}
+              <div style={{
+                position: 'absolute',
+                top: '-50px',
+                right: '-50px',
+                width: '150px',
+                height: '150px',
+                background: 'rgba(255, 215, 0, 0.05)',
+                filter: 'blur(40px)',
+                borderRadius: '50%',
+                pointerEvents: 'none'
+              }} />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 className="chart-title" style={{
+                  color: 'var(--c-accent)',
+                  margin: 0,
+                  borderBottom: 'none',
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center'
+                }}>
+                  <FiMessageSquare style={{ verticalAlign: 'middle', marginRight: '8px', color: 'var(--c-accent)' }} /> Natural Language Query Engine
+                </h3>
+
+                {/* AI Copilot Badge */}
+                <span style={{
+                  background: 'rgba(255, 215, 0, 0.15)',
+                  color: 'var(--c-accent)',
+                  border: '1px solid rgba(255, 215, 0, 0.3)',
+                  padding: '4px 10px',
+                  borderRadius: '12px',
+                  fontSize: '0.75rem',
+                  fontWeight: '700',
+                  letterSpacing: '1px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: '0 0 8px rgba(255, 215, 0, 0.1)'
+                }}>
+                  <span style={{
+                    width: '6px',
+                    height: '6px',
+                    backgroundColor: 'var(--c-accent)',
+                    borderRadius: '50%',
+                    display: 'inline-block',
+                    boxShadow: '0 0 6px var(--c-accent)'
+                  }} />
+                  AI COPILOT
+                </span>
+              </div>
 
               <div style={{
                 flex: 1,
@@ -702,7 +760,7 @@ export default function App() {
             </div>
 
             {/* ROW 3: Grid diagnostics */}
-            <div className="charts-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+            <div className="charts-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', marginTop: '2rem' }}>
 
               {/* Box 1: Slow Endpoints Table */}
               <div className="glass-panel table-card">
