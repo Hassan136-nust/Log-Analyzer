@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FiBox, FiUploadCloud, FiSearch, FiCheckCircle, FiXCircle, FiBarChart2, FiActivity, FiClock, FiAlertTriangle, FiGlobe, FiTarget, FiZap } from 'react-icons/fi';
+import { FiBox, FiUploadCloud, FiSearch, FiCheckCircle, FiXCircle, FiBarChart2, FiActivity, FiClock, FiAlertTriangle, FiGlobe, FiTarget, FiZap, FiMessageSquare } from 'react-icons/fi';
 import { parseLine } from './utils/logParser';
 
 export default function App() {
@@ -18,6 +18,12 @@ export default function App() {
 
   // Compiled metrics dashboard state
   const [metrics, setMetrics] = useState(null);
+
+  // Natural Language Query Engine state
+  const [chatHistory, setChatHistory] = useState([
+    { type: 'system', content: 'Hello! I am your Log Query Assistant. Ask me anything about the loaded logs! You can try commands like "show errors", "slowest endpoints", or "visitor counts".' }
+  ]);
+  const [queryInput, setQueryInput] = useState('');
 
   // Default sample logs for users to click and load
   const SAMPLE_LOGS = [
@@ -218,6 +224,72 @@ export default function App() {
     return Object.entries(map)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10);
+  };
+
+  const handleQuerySubmit = (e) => {
+    e.preventDefault();
+    if (!queryInput.trim()) return;
+
+    const query = queryInput.trim().toLowerCase();
+    const userMsg = { type: 'user', content: queryInput };
+
+    let answerContent = '';
+
+    if (!metrics) {
+      answerContent = 'It looks like no log metrics are loaded yet. Please load or paste some logs in the playground tab first so I can analyze them!';
+    } else if (query.includes('error') || query.includes('fail') || query.includes('skipped') || query.includes('anomaly') || query.includes('malform')) {
+      const errRate = metrics.errorRate;
+      const invalidCount = metrics.invalidLines;
+      const malformedCats = Object.entries(metrics.malformedCategories);
+
+      let breakdown = 'None';
+      if (malformedCats.length > 0) {
+        breakdown = malformedCats.map(([reason, count]) => `• ${reason}: ${count}`).join('\n');
+      }
+
+      answerContent = `Current Error Rate: ${errRate}%\nTotal skipped/invalid lines: ${invalidCount} of ${metrics.totalLines} lines.\n\nSkipped / Anomaly category breakdown:\n${breakdown}`;
+    } else if (query.includes('slow') || query.includes('latency') || query.includes('performance') || query.includes('bottleneck')) {
+      const bottlenecks = getBottlenecks().slice(0, 5);
+      if (bottlenecks.length === 0) {
+        answerContent = 'No response latency measurements are available.';
+      } else {
+        const text = bottlenecks.map((item, idx) => `${idx + 1}. ${item.path} - Avg: ${item.avg}ms (Max: ${item.max}ms, ${item.count} hits)`).join('\n');
+        answerContent = `Top performance bottlenecks by average latency:\n${text}`;
+      }
+    } else if (query.includes('ip') || query.includes('visitor') || query.includes('client')) {
+      const topIps = getTopHits(metrics.ipHits).slice(0, 5);
+      if (topIps.length === 0) {
+        answerContent = 'No visitor IP records are available.';
+      } else {
+        const text = topIps.map(([ip, count]) => `• ${ip}: ${count} hits (${((count / metrics.validLines) * 100).toFixed(1)}%)`).join('\n');
+        answerContent = `Top 5 IP Visitors:\n${text}`;
+      }
+    } else if (query.includes('path') || query.includes('route') || query.includes('endpoint') || query.includes('hit') || query.includes('hot')) {
+      const topPaths = getTopHits(metrics.pathHits).slice(0, 5);
+      if (topPaths.length === 0) {
+        answerContent = 'No endpoint records are available.';
+      } else {
+        const text = topPaths.map(([p, count]) => `• ${p}: ${count} hits (${((count / metrics.validLines) * 100).toFixed(1)}%)`).join('\n');
+        answerContent = `Top 5 Requested Routes:\n${text}`;
+      }
+    } else if (query.includes('volume') || query.includes('total') || query.includes('sanity') || query.includes('stats') || query.includes('summary')) {
+      const cleanRatio = ((metrics.validLines / metrics.totalLines) * 100).toFixed(1);
+      answerContent = `Audit Summary:\n• Total Volume Audited: ${metrics.totalLines} lines\n• Valid Logs: ${metrics.validLines} (${cleanRatio}% accuracy)\n• Invalid/Skipped Logs: ${metrics.invalidLines}\n• JSON Format Logs: ${metrics.jsonCount}\n• Standard Format Logs: ${metrics.standardCount}\n• Average Latency: ${metrics.avgLatency}ms (Min: ${metrics.minLatency}ms, Max: ${metrics.maxLatency}ms)`;
+    } else if (query.includes('help') || query.includes('command') || query.includes('what can you do')) {
+      answerContent = 'I can answer questions about the loaded logs. Here are the query types I support:\n• "errors" / "fail": Service Error Rate & Anomaly/Skipped report.\n• "slowest" / "latency": Top slow bottlenecks.\n• "visitors" / "IPs": Most active clients.\n• "routes" / "endpoints": Highest traffic URL hits.\n• "summary" / "volume": Overviews of audited lines.';
+    } else {
+      const matchedPaths = Object.keys(metrics.pathHits).filter(p => p.toLowerCase().includes(query));
+      if (matchedPaths.length > 0) {
+        const text = matchedPaths.slice(0, 5).map(p => `• ${p}: ${metrics.pathHits[p]} hits`).join('\n');
+        answerContent = `Found direct request route matches for "${query}":\n${text}`;
+      } else {
+        answerContent = `Sorry, I couldn't find a direct query match or route match for "${queryInput}".\nType "help" to see available query templates or try "slowest urls", "errors", or "visitor counts".`;
+      }
+    }
+
+    const systemMsg = { type: 'system', content: answerContent };
+    setChatHistory(prev => [...prev, userMsg, systemMsg]);
+    setQueryInput('');
   };
 
   return (
@@ -572,6 +644,63 @@ export default function App() {
 
             </div>
 
+            {/* ROW 5: Natural Language Chat Interface */}
+            <div className="glass-panel" style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+              <h3 className="chart-title" style={{ color: 'var(--c-accent)' }}>
+                <FiMessageSquare style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Natural Language Query Engine
+              </h3>
+
+              <div style={{
+                flex: 1,
+                minHeight: '200px',
+                maxHeight: '400px',
+                overflowY: 'auto',
+                padding: '1rem',
+                background: 'rgba(0,0,0,0.3)',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                fontFamily: 'var(--font-mono)'
+              }}>
+                {chatHistory.map((msg, idx) => (
+                  <div key={idx} style={{
+                    marginBottom: '1rem',
+                    paddingLeft: '1rem',
+                    borderLeft: msg.type === 'system' ? '3px solid var(--c-cyan)' : '3px solid var(--c-text-muted)'
+                  }}>
+                    <div style={{ fontSize: '0.8rem', color: msg.type === 'system' ? 'var(--c-cyan)' : 'var(--c-text-muted)', marginBottom: '4px' }}>
+                      {msg.type === 'system' ? 'System' : 'You'}
+                    </div>
+                    <div style={{ color: msg.type === 'system' ? 'var(--c-text)' : 'var(--c-white)', whiteSpace: 'pre-wrap' }}>
+                      {msg.isJSX ? msg.content : msg.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <form onSubmit={handleQuerySubmit} style={{ display: 'flex', gap: '10px' }}>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="Ask a question... e.g., 'show errors' or 'slowest endpoints'"
+                  value={queryInput}
+                  onChange={e => setQueryInput(e.target.value)}
+                  style={{ flex: 1, fontFamily: 'var(--font-mono)' }}
+                />
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{
+                    padding: '0 1.5rem',
+                    backgroundColor: 'rgba(255, 215, 0, 0.3)',
+                    borderColor: 'rgba(255, 215, 0, 0.3)',
+                    color: '#fff'
+                  }}
+                >
+                  Query
+                </button>
+              </form>
+            </div>
+
             {/* ROW 3: Grid diagnostics */}
             <div className="charts-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
 
@@ -734,10 +863,9 @@ export default function App() {
             </div>
 
           </div>
-        )
-        }
+        )}
 
-      </main >
-    </div >
+      </main>
+    </div>
   );
 }
