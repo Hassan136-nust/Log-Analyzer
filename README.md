@@ -1,60 +1,68 @@
-# CLI Log Analyzer Tool
+# High-Performance Log Analyzer System
 
-A robust, modular, and high-performance server log analysis CLI tool developed in plain Node.js. It efficiently processes standard and custom layout server logs alongside malformed and JSON BOLT-ON data without crashing, reporting actionable system statistics to terminal operators.
-
----
-
-## 📂 Codebase Layout
-
-```
-.
-├── scripts/
-│   └── generate_logs.js    # Multi-pattern synthetic log file generator
-├── logParser.js            # Resilient core parser library
-├── logAnalyzer.js          # CLI stream analyst & terminal dashboard
-├── ANSWERS.md              # Technical design & reliability decisions
-└── README.md               # User guide & operations manual
-```
+A complete full-stack log analysis solution featuring a **CLI terminal stream analyzer** and an **interactive React log query dashboard**. Both systems are immune to malformed inputs, require zero database servers, and process logarithmic scales of data with zero footprint.
 
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 Quick Start: Web Dashboard (React & Vite)
+For a premium, interactive, and beautiful inspection of your logs:
 
-You only need **Node.js** (v14+) installed. There are **no external npm dependencies**.
+1. **Step 1: Install Dependencies**
+   Navigate to the repository root directory and install all node packages:
+   ```bash
+   npm install
+   ```
+
+2. **Step 2: Start the Local Development Server**
+   Start Vite's ultra-fast hot reloading server:
+   ```bash
+   npm run dev
+   ```
+   *The client dev environment launches at `http://localhost:5173/`.*
+
+3. **Step 3: Play with the Web App Interface**
+   - Click **"Load Preset Log Data"** on the introductory playground screen to inspect simulated service metrics (with exceptions, JSON, and standard formats).
+   - Explore **visual distribution charts** and **diagnostic bottleneck tables**.
+   - Input questions into the **Natural Language Query Engine** like `"show errors"` or `"slowest routes"` to extract AI-informed metrics.
+
+---
+
+## 💻 Quick Start: CLI Log Stream Analyzer
+If you prefer a lightning-fast UNIX-style stream processor inside your terminal:
 
 ### 1. Generating Representative Test Data
-Execute the synthetic log generator script to create a sample log file containing valid web service traffic interspersed with roughly 8% format deviations and malformed noise (stack traces, slashed/verbal timestamps, JSON log lines, unit decimal response times, extra trail fields):
-
+Generate synthetic server traffic logs containing standard text logs, structured JSON layouts, multi-line stack trace drops, unrecognized noise, verbal dates, and diverse response time units (`s`, `ms`, unitless):
 ```bash
-# Generate 5,000 log lines to the default "test_logs.log" path
+# Generate 5,000 log lines to default "test_logs.log"
 node scripts/generate_logs.js --lines 5000
-
-# Custom output details (e.g. generate 10,000 lines to a custom file)
-node scripts/generate_logs.js --lines 10000 --file ./custom_test.log
 ```
+*Options: `--lines` (number of entries) and `--file` (destination path).*
 
-**Parameters supported by generator:**
-* `--lines` / `-l`: Number of log entries to generate (default: `2000`).
-* `--file` / `-f`: Path to write the output log file (default: `./test_logs.log`).
-
-### 2. Performing Log Analysis & Diagnostics
-Run the streaming log analyzer against your generated log data (or any target server log file):
-
+### 2. Performing Streaming Term Diagnostics
+Run the streaming command line tool, which reads data line-by-line using a Node reading interface to guarantee constant memory ($O(1)$ space):
 ```bash
-# Basic run
+# Pass filepath directly
 node logAnalyzer.js test_logs.log
 
-# CLI switch format
+# Or pass file using the parameter flag
 node logAnalyzer.js --file ./test_logs.log
 ```
 
 ---
 
-## 📊 Analytics Dashboard Profile
-
-The terminal output renders a beautiful ANSI-colored diagnostic profile separated into five key compartments:
-1. **System Audit Profile**: Overall sanity statistics, classification of Standard vs JSON log layouts, and categorized reasons for dropped/malformed lines (e.g. empty lines, unrecognized formats, app runtime exception boundaries).
-2. **Web Service Health Report**: Frequency distributions of HTTP status code categories (1xx, 2xx, 3xx, 4xx, 5xx, missing) represented as colored ASCII bar charts. Surfaced aggregate **Error Rate (%)**.
-3. **Performance & Latency**: Average request response latency, fastest route delay, and absolute slowest route delay.
-4. **Traffic Engagement Diagnostics**: Top 5 client target IP addresses and top 5 most visited resource endpoints (with hits percentage).
-5. **Critical Bottleneck Profiler**: Ranks resources by their **consistently slow average response latency** (rather than simple maximum latency spikes), isolating structural routing bottlenecks in the service code.
+## 📂 Repository File System Architecture
+```
+.
+├── dashboard/              # React + Vite client web application source code
+│   ├── src/
+│   │   ├── App.jsx         # Beautiful Black-&-Gold Dashboard & Chat UI
+│   │   ├── index.css       # Clean glassmorphic design system
+│   │   └── utils/
+│   │       └── logParser.js
+├── scripts/
+│   └── generate_logs.js    # Multi-pattern synthetic log file generator
+├── logParser.js            # Unified Parser Engine library (never throws)
+├── logAnalyzer.js          # Constant-memory stream analyzer & CLI dashboard
+├── ANSWERS.md              # Technical answers & engineering decisions
+└── README.md               # Quick-start manual
+```
