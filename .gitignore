@@ -1,0 +1,35 @@
+# Dependency caches
+node_modules/
+jspm_packages/
+.pnp
+.pnp.js
+
+# Production build output
+dist/
+build/
+.yarn/
+
+# Environmental configs
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs generated or test runs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# IDE and Editor configs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
