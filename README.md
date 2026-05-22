@@ -1,29 +1,30 @@
-# High-Performance Log Analyzer System
-
-A complete full-stack log analysis solution featuring a **CLI terminal stream analyzer** and an **interactive React log query dashboard**. Both systems are immune to malformed inputs, require zero database servers, and process logarithmic scales of data with zero footprint.
-
----
-
 ## 🚀 Quick Start: Web Dashboard (React & Vite)
+
 For a premium, interactive, and beautiful inspection of your logs:
 
-1. **Step 1: Install Dependencies**
-   Navigate to the repository root directory and install all node packages:
+1. **Step 1: Enter Dashboard Directory**
+   Navigate into the frontend dashboard folder:
+   ```bash
+   cd dashboard
+   ```
+
+2. **Step 2: Install Dependencies**
+   Install all required Node.js packages:
    ```bash
    npm install
    ```
 
-2. **Step 2: Start the Local Development Server**
-   Start Vite's ultra-fast hot reloading server:
+3. **Step 3: Start the Local Development Server**
+   Launch Vite’s ultra-fast hot-reloading development server:
    ```bash
    npm run dev
    ```
-   *The client dev environment launches at `http://localhost:5173/`.*
+   *The client dev environment will be available at `http://localhost:5173/`.*
 
-3. **Step 3: Play with the Web App Interface**
-   - Click **"Load Preset Log Data"** on the introductory playground screen to inspect simulated service metrics (with exceptions, JSON, and standard formats).
+4. **Step 4: Play with the Web App Interface**
+   - Click **"Load Preset Log Data"** on the introductory playground screen to inspect simulated service metrics (exceptions, JSON logs, and standard formats).
    - Explore **visual distribution charts** and **diagnostic bottleneck tables**.
-   - Input questions into the **Natural Language Query Engine** like `"show errors"` or `"slowest routes"` to extract AI-informed metrics.
+   - Use the **Natural Language Query Engine** with inputs like `"show errors"` or `"slowest routes"` to extract analytical insights.
 
 ---
 
@@ -42,10 +43,8 @@ node scripts/generate_logs.js --lines 5000
 Run the streaming command line tool, which reads data line-by-line using a Node reading interface to guarantee constant memory ($O(1)$ space):
 ```bash
 # Pass filepath directly
-node logAnalyzer.js test_logs.log
+node logAnalyzer.js 
 
-# Or pass file using the parameter flag
-node logAnalyzer.js --file ./test_logs.log
 ```
 
 ---
