@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FiBox, FiUploadCloud, FiSearch, FiCheckCircle, FiXCircle, FiBarChart2, FiActivity, FiClock, FiAlertTriangle, FiGlobe, FiTarget, FiZap } from 'react-icons/fi';
 import { parseLine } from './utils/logParser';
 
 export default function App() {
@@ -265,7 +266,7 @@ export default function App() {
             {/* LEFT COLUMN: Controls Sandbox */}
             <div className="glass-panel playground-card">
               <h2 className="playground-title">
-                📊 Client Log Sandbox
+                <FiBarChart2 /> Client Log Sandbox
               </h2>
               <div className="form-group">
                 <label className="form-label">Single Line Live Playground</label>
@@ -309,7 +310,7 @@ export default function App() {
                         e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
                       }}
                     >
-                      💡 {sample.label}
+                      <FiBox style={{ verticalAlign: 'middle', marginRight: '4px' }} /> {sample.label}
                     </button>
                   ))}
                 </div>
@@ -317,7 +318,7 @@ export default function App() {
 
               {/* Bulk uploading / Pasting boundaries */}
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.25rem' }}>
-                <h3 className="form-label" style={{ fontWeight: 700, marginBottom: '10px' }}>⚡ Batch Log File Upload (Drag & Drop)</h3>
+                <h3 className="form-label" style={{ fontWeight: 700, marginBottom: '10px' }}><FiUploadCloud style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Batch Log File Upload (Drag & Drop)</h3>
 
                 <div
                   className={`drag-zone ${isDragActive ? 'active' : ''}`}
@@ -343,7 +344,7 @@ export default function App() {
 
                 {fileProgress && (
                   <p style={{ fontSize: '0.8rem', color: 'var(--c-cyan)', marginTop: '8px', textAlign: 'center' }}>
-                    ⌛ {fileProgress}
+                    <FiClock style={{ verticalAlign: 'middle' }} /> {fileProgress}
                   </p>
                 )}
 
@@ -382,14 +383,14 @@ export default function App() {
             {/* RIGHT COLUMN: Parse Result visualization */}
             <div className="glass-panel" style={{ padding: '1.5rem' }}>
               <h2 className="playground-title" style={{ color: 'var(--c-accent)' }}>
-                🔍 Live Parser Result Properties
+                <FiSearch /> Live Parser Result Properties
               </h2>
 
               {sandboxResult ? (
                 <div>
                   <div style={{ display: 'flex', gap: '10px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
                     <span className={`chip ${sandboxResult.valid ? 'valid' : 'invalid'}`}>
-                      {sandboxResult.valid ? '✔ Valid Log' : '✖ Malformed'}
+                      {sandboxResult.valid ? <><FiCheckCircle style={{ verticalAlign: 'text-bottom', marginRight: '4px' }} /> Valid Log</> : <><FiXCircle style={{ verticalAlign: 'text-bottom', marginRight: '4px' }} /> Malformed</>}
                     </span>
                     {sandboxResult.valid && (
                       <span className={`chip ${sandboxResult.format}`}>
@@ -451,7 +452,7 @@ export default function App() {
                 </div>
               ) : (
                 <p style={{ color: 'var(--c-text-muted)', fontSize: '0.9rem', textAlign: 'center', marginTop: '4rem' }}>
-                  💡 Enter or select a log line on the left to see instant parsed details.
+                  <FiSearch style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Enter or select a log line on the left to see instant parsed details.
                 </p>
               )}
             </div>
@@ -495,7 +496,7 @@ export default function App() {
 
               {/* Graphic 1: Clean responsive SVG Status Frequency bar chart */}
               <div className="glass-panel chart-card">
-                <h3 className="chart-title">🚦 HTTP Code Severity Distribution</h3>
+                <h3 className="chart-title"><FiActivity style={{ verticalAlign: 'middle', marginRight: '6px' }} /> HTTP Code Severity Distribution</h3>
                 <div className="svg-chart-container">
                   <svg width="100%" height="220" viewBox="0 0 320 220" style={{ overflow: 'visible' }}>
                     {/* Draw borders & gridlines */}
@@ -546,7 +547,7 @@ export default function App() {
 
               {/* Graphic 2: Anomaly Category skips list */}
               <div className="glass-panel chart-card">
-                <h3 className="chart-title">⚠️ Log Exception / Anomaly Classification</h3>
+                <h3 className="chart-title"><FiAlertTriangle style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Log Exception / Anomaly Classification</h3>
                 <div className="metric-list" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {Object.keys(metrics.malformedCategories).length > 0 ? (
                     Object.entries(metrics.malformedCategories).map(([reason, count], idx) => (
@@ -563,7 +564,7 @@ export default function App() {
                     ))
                   ) : (
                     <p style={{ color: 'var(--c-green)', fontSize: '0.85rem', textAlign: 'center', marginTop: '3rem' }}>
-                      ✔ Incredible! 0 anomalous skips or malformed codes reported.
+                      <FiCheckCircle style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Incredible! 0 anomalous skips or malformed codes reported.
                     </p>
                   )}
                 </div>
@@ -577,7 +578,7 @@ export default function App() {
               {/* Box 1: Slow Endpoints Table */}
               <div className="glass-panel table-card">
                 <h3 className="chart-title" style={{ borderBottomColor: 'rgba(239, 68, 68, 0.15)', color: 'var(--c-yellow)' }}>
-                  🐢 Slowest Service Bottlenecks
+                  <FiClock style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Slowest Service Bottlenecks
                 </h3>
                 <div className="table-wrapper">
                   <table className="data-table">
@@ -613,7 +614,7 @@ export default function App() {
               {/* Box 2: Top Active IP Visitors */}
               <div className="glass-panel table-card">
                 <h3 className="chart-title" style={{ borderBottomColor: 'rgba(6, 182, 212, 0.15)', color: 'var(--c-cyan)' }}>
-                  👥 Top Client IP Visitors
+                  <FiGlobe style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Top Client IP Visitors
                 </h3>
                 <div className="table-wrapper">
                   <table className="data-table">
@@ -641,7 +642,7 @@ export default function App() {
 
               {/* Box 3: Top Hits paths */}
               <div className="glass-panel table-card">
-                <h3 className="chart-title">🚀 Hot Request Routes</h3>
+                <h3 className="chart-title"><FiTarget style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Hot Request Routes</h3>
                 <div className="table-wrapper">
                   <table className="data-table">
                     <thead>
